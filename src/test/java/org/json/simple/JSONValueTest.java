@@ -2,8 +2,12 @@ package org.json.simple;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+import java.util.stream.DoubleStream;
 
 import junit.framework.TestCase;
+import org.json.simple.parser.ParseException;
 
 public class JSONValueTest extends TestCase {
 	public void testByteArrayToString() throws IOException {
@@ -130,13 +134,68 @@ public class JSONValueTest extends TestCase {
 		JSONValue.writeJSONString(new float[] { -7.1f, 22.234f, 86.7f, -99.02f }, writer);
 		assertEquals("[-7.1,22.234,86.7,-99.02]", writer.toString());
 	}
-	
+	public void testLongViaDouble() throws IOException {
+        try {
+            long aLong = Long.MAX_VALUE;// - 9220000000000000000L;
+            Double aDouble = new Double(aLong);
+            String jsonString = JSONValue.toJSONString(aDouble);
+            System.out.println(jsonString + "?=" + aLong);
+            Object actual = JSONValue.parseWithException(jsonString);
+            assertTrue(actual.getClass()==Double.class);
+            assertEquals(aLong, ((Double) actual).longValue());
+            assertEquals(aDouble, actual);
+        } catch (ParseException e) {
+            fail();
+        }
+    }
+	public void testLongViaFloat() throws IOException {
+        try {
+            long aLong = Long.MAX_VALUE;// 9223372036854775807
+            Float aFloat = new Float(aLong);
+            String jsonString = JSONValue.toJSONString(aFloat); // reduces precision
+            System.out.println(jsonString + "?=" + aFloat);
+            System.out.println(jsonString + "?=" + aLong);
+            Object actual = JSONValue.parseWithException(jsonString);
+            assertTrue(actual.getClass()==Double.class); // cannot distinct Float
+            assertEquals(aFloat, ((Double) actual).floatValue()); // comparable as float
+            // assertEquals((double)aFloat, actual); // 9.223372036854776E18!=9.223372E18
+            System.out.println("Delta=" + ((double)aFloat - (double)actual));
+            assertEquals((double)aFloat, (double)actual, 3.6854775808E10); // 9.223372036854776E18!=9.223372E18
+            assertEquals(Double.parseDouble("9.223372E18"), actual); // reduced precision
+            // assertEquals(aLong, ((Double) actual).longValue());//9223372036854775807!=9223372000000000000
+        } catch (ParseException e) {
+            fail();
+        }
+    }
+
+	public void testIntegerViaFloat() throws IOException {
+        try {
+            int aInteger = Integer.MAX_VALUE;// 2147483647
+            Float aFloat = new Float(aInteger); // 2.14748365E9
+            String jsonString = JSONValue.toJSONString(aFloat);
+            System.out.println(jsonString + "?=" + aFloat);
+            System.out.println(jsonString + "?=" + aInteger);
+            Object actual = JSONValue.parseWithException(jsonString);
+            assertTrue(actual.getClass()==Double.class);
+            assertEquals(aInteger, ((Double) actual).intValue()); // restoring
+            assertEquals(aFloat, ((Double) actual).floatValue()); // comparable as float
+            // assertEquals((double)aFloat, actual);
+            assertEquals(Double.parseDouble("2.14748365E9"), actual); // not comparable as Double
+        } catch (ParseException e) {
+            fail();
+        }
+    }
 	public void testDoubleArrayToString() throws IOException {
 		assertEquals("null", JSONValue.toJSONString((double[])null));
 		assertEquals("[]", JSONValue.toJSONString(new double[0]));
 		assertEquals("[12.8]", JSONValue.toJSONString(new double[] { 12.8 }));
 		assertEquals("[-7.1,22.234,86.7,-99.02]", JSONValue.toJSONString(new double[] { -7.1, 22.234, 86.7, -99.02 }));
-		
+        // Long.MAX_VALUE==9223372036854775807L
+		assertEquals("[9.223372E18,3.4028235E38]", JSONValue.toJSONString(new float[] { Long.MAX_VALUE, Float.MAX_VALUE }));
+		assertEquals("[9.223372036854776E18,1.7976931348623157E308]", JSONValue.toJSONString(new double[] { Long.MAX_VALUE, Double.MAX_VALUE }));
+		assertEquals("[3.372036854775807E15,1.7976931348623157E308]",
+                JSONValue.toJSONString(new double[] { Long.MAX_VALUE-9220000000000000000L, Double.MAX_VALUE }));
+
 		StringWriter writer;
 		
 		writer = new StringWriter();
